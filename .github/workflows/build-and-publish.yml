@@ -34,7 +34,7 @@ jobs:
         run: |
           missing=()
           for key in SIGNING_KEY ALIAS KEY_STORE_PASSWORD KEY_PASSWORD; do
-            if [ -z "$${!key}" ]; then missing+=("$key"); fi
+            if [ -z "${!key}" ]; then missing+=("$key"); fi
           done
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Missing repository Actions secrets: ${missing[*]}"
