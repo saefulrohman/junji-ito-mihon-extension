@@ -80,7 +80,6 @@ jobs:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew :src:id:junjito:spotlessApply
           ./gradlew :src:id:junjito:lintRelease :src:id:junjito:assembleRelease --no-daemon
 
       - name: Derive signing fingerprint
