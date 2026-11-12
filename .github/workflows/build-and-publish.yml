@@ -1,0 +1,151 @@
+name: Build and publish Mihon extension
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - ".github/workflows/build-and-publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mihon-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          missing=()
+          for key in SIGNING_KEY ALIAS KEY_STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "$${!key}" ]; then missing+=("$key"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing repository Actions secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Checkout current Keiyoushi build system
+        uses: actions/checkout@v4
+        with:
+          repository: keiyoushi/extensions-source
+          ref: main
+          path: upstream
+
+      - name: Overlay this extension into upstream build
+        shell: bash
+        run: |
+          rm -rf upstream/src/id/junjito
+          mkdir -p upstream/src/id
+          cp -R src/id/junjito upstream/src/id/junjito
+
+      - name: Prepare signing key
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          printf '%s' "$SIGNING_KEY" | base64 --decode > upstream/signingkey.jks
+          test -s upstream/signingkey.jks
+
+      - name: Build and lint release
+        working-directory: upstream
+        env:
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew :src:id:junjito:spotlessApply
+          ./gradlew :src:id:junjito:lintRelease :src:id:junjito:assembleRelease --no-daemon
+
+      - name: Derive signing fingerprint
+        id: signing
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ALIAS }}
+        working-directory: upstream
+        run: |
+          fingerprint=$(keytool -list -v -keystore signingkey.jks -storepass "$KEY_STORE_PASSWORD" -alias "$ALIAS" | awk -F': ' '/SHA256:/{gsub(":","",$2); print tolower($2); exit}')
+          test -n "$fingerprint"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release files
+        id: release
+        working-directory: upstream
+        run: |
+          info="src/id/junjito/build/keiyoushi-source-info.json"
+          apk=$(find src/id/junjito/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
+          jar=$(find src/id/junjito/build/outputs/jar/release -maxdepth 1 -name '*.jar' -print -quit)
+          test -f "$info" && test -f "$apk" && test -f "$jar"
+          version=$(python -c 'import json; print(json.load(open("'"$info"'"))["versionName"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+          echo "jar=$jar" >> "$GITHUB_OUTPUT"
+          mkdir -p ../release-files
+          cp "$apk" ../release-files/
+          cp "$jar" ../release-files/
+          cp "$info" ../release-files/keiyoushi-source-info.json
+
+      - name: Generate Mihon repository index
+        env:
+          SIGNING_FINGERPRINT: ${{ steps.signing.outputs.fingerprint }}
+          RELEASE_TAG: v${{ steps.release.outputs.version }}
+          APK_NAME: ${{ steps.release.outputs.apk }}
+          JAR_NAME: ${{ steps.release.outputs.jar }}
+        run: |
+          python -m pip install --disable-pip-version-check protobuf==7.35.1
+          python scripts/publish_index.py
+
+      - name: Publish versioned GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release delete "$RELEASE_TAG" --yes
+          fi
+          gh release create "$RELEASE_TAG" release-files/* \
+            --title "Junji Ito Manga Indonesia $RELEASE_TAG" \
+            --notes "Automatically built Mihon extension. Source commit: $GITHUB_SHA"
+
+      - name: Commit updated Mihon repository index
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.pb index.json repo.json
+          if git diff --cached --quiet; then
+            echo "Repository index did not change."
+          else
+            git commit -m "Publish Mihon index for ${{ steps.release.outputs.version }}"
+            git push
+          fi
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f upstream/signingkey.jks
