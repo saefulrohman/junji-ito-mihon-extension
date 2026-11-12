@@ -73,6 +73,11 @@ jobs:
           printf '%s' "$SIGNING_KEY" | base64 --decode > upstream/signingkey.jks
           test -s upstream/signingkey.jks
 
+      - name: Apply Kotlin formatting
+        working-directory: upstream
+        run: |
+          ./gradlew :src:id:junjito:spotlessApply --no-daemon
+
       - name: Build and lint release
         working-directory: upstream
         env:
