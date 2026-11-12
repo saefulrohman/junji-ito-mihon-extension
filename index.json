@@ -1,0 +1,34 @@
+{
+  "name": "Saeful's Mihon Extensions",
+  "badgeLabel": "SAEFUL",
+  "signingKey": "f9c481c44f833c18ec91d5998ce2e77126b051dc2af5faafa75454ae00778dfd",
+  "contact": {
+    "website": "https://github.com/saefulrohman/junji-ito-mihon-extension"
+  },
+  "extensionList": {
+    "extensions": [
+      {
+        "name": "Junji Ito Manga Indonesia",
+        "packageName": "eu.kanade.tachiyomi.extension.id.junjito",
+        "resources": {
+          "apkUrl": "https://github.com/saefulrohman/junji-ito-mihon-extension/releases/download/v1.6.2/tachiyomi-id.junjito-v1.6.2.apk",
+          "iconUrl": "https://junjiitomangaindonesia.blogspot.com/favicon.ico",
+          "jarUrl": "https://github.com/saefulrohman/junji-ito-mihon-extension/releases/download/v1.6.2/tachiyomi-id.junjito-v1.6.2.jar"
+        },
+        "extensionLib": "1.6",
+        "versionCode": "106002",
+        "versionName": "1.6.2",
+        "contentWarning": "CONTENT_WARNING_MIXED",
+        "sources": [
+          {
+            "id": "752574506494690988",
+            "name": "Junji Ito Manga Indonesia",
+            "language": "id",
+            "homeUrl": "https://junjiitomangaindonesia.blogspot.com",
+            "mirrorUrls": []
+          }
+        ]
+      }
+    ]
+  }
+}
