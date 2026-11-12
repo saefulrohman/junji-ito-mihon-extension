@@ -86,8 +86,7 @@ abstract class JunjiItoIndonesia : KeiSource() {
         }
     }
 
-    override fun getMangaUrl(manga: SManga): String =
-        if (manga.url.startsWith("http")) manga.url else "$baseUrl${manga.url}"
+  override fun getMangaUrl(manga: SManga): String = if (manga.url.startsWith("http")) manga.url else "$baseUrl${manga.url}"
 
     override fun getChapterUrl(chapter: SChapter): String =
         if (chapter.url.startsWith("http")) chapter.url else "$baseUrl${chapter.url}"
