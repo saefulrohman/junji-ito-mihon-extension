@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import keiyoushi.annotation.Source
+import keiyoushi.network.Fetch
 import keiyoushi.network.get
 import keiyoushi.source.KeiSource
 import keiyoushi.utils.asJsoup
@@ -74,7 +75,7 @@ abstract class JunjiItoIndonesia : KeiSource() {
     override suspend fun getMangaByUrl(url: HttpUrl): SManga? {
         if (url.host != baseUrl.toHttpUrl().host || !isBloggerPost(url.encodedPath)) return null
 
-        val doc = client.get(url.toString()).asJsoup()
+        val doc = client.get(url.toString(), Fetch.DOCUMENT).asJsoup()
         val title = extractPostTitle(doc) ?: return null
 
         return SManga.create().apply {
@@ -97,7 +98,7 @@ abstract class JunjiItoIndonesia : KeiSource() {
         fetchDetails: Boolean,
         fetchChapters: Boolean,
     ): SMangaUpdate {
-        val doc = client.get(getMangaUrl(manga)).asJsoup()
+        val doc = client.get(getMangaUrl(manga), Fetch.DOCUMENT).asJsoup()
         val title = extractPostTitle(doc) ?: manga.title
         val image = extractPostImages(doc).firstOrNull()
 
@@ -125,7 +126,7 @@ abstract class JunjiItoIndonesia : KeiSource() {
         repeat(maxContinuationPages) {
             if (!visited.add(currentUrl)) return@repeat
 
-            val doc = client.get(currentUrl).asJsoup()
+            val doc = client.get(currentUrl, Fetch.DOCUMENT).asJsoup()
             extractPostImages(doc).forEach(imageUrls::add)
 
             val nextUrl = findContinuationUrl(doc) ?: return imageUrls.mapIndexed { index, image ->
@@ -138,7 +139,7 @@ abstract class JunjiItoIndonesia : KeiSource() {
     }
 
     private suspend fun fetchCatalog(): List<CatalogEntry> {
-        val doc = client.get(catalogUrl).asJsoup()
+        val doc = client.get(catalogUrl, Fetch.DOCUMENT).asJsoup()
         val content = doc.selectFirst(".post-body") ?: doc.selectFirst(".entry-content") ?: doc
         val entries = linkedMapOf<String, CatalogEntry>()
 
